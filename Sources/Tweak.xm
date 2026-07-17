@@ -11,12 +11,15 @@
 #import "RCTHost.h"
 #import "RCTInstance.h"
 #import "Fonts.h"
+#import "Settings.h"
 
 using namespace facebook;
 
 static jsi::Runtime *gRuntime = NULL;
 NSString *bunnyPatchesBundlePath;
 static LoaderConfig  *loaderConfig;
+static NSTimeInterval shakeStartTime = 0;
+static BOOL           isShaking      = NO;
 
 static NSURL *resolveDownloadURL(void)
 {
@@ -269,6 +272,32 @@ static void executePreloads(jsi::Runtime &runtime, NSURL *rainDir)
     {
         downloadBundleForNextLaunch(rainDir);
     }
+}
+
+%end
+
+%hook UIWindow
+
+- (void)motionBegan:(UIEventSubtype)motion withEvent:(UIEvent *)event
+{
+    if (motion == UIEventSubtypeMotionShake)
+    {
+        isShaking      = YES;
+        shakeStartTime = [[NSDate date] timeIntervalSince1970];
+    }
+    %orig;
+}
+
+- (void)motionEnded:(UIEventSubtype)motion withEvent:(UIEvent *)event
+{
+    if (motion == UIEventSubtypeMotionShake && isShaking)
+    {
+        NSTimeInterval shakeDuration = [[NSDate date] timeIntervalSince1970] - shakeStartTime;
+        if (shakeDuration >= 0.5 && shakeDuration <= 2.0)
+            dispatch_async(dispatch_get_main_queue(), ^{ showSettingsSheet(); });
+        isShaking = NO;
+    }
+    %orig;
 }
 
 %end

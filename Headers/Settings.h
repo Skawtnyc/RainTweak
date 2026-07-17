@@ -7,4 +7,13 @@
 @end
 
 extern id gBridge;
-void      showSettingsSheet(void);
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void showSettingsSheet(void);
+
+#ifdef __cplusplus
+}
+#endif
