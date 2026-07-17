@@ -4,9 +4,14 @@
 @class RainTweakSettingsViewController;
 
 extern BOOL isJailbroken;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 BOOL        isSafeModeEnabled(void);
 BOOL        restoreBundleFromBackup(void);
-NSURL      *getPyoncordDirectory(void);
+NSURL      *getRainDirectory(void);
 NSURL      *getBundleBackupURL(void);
 UIColor    *hexToUIColor(NSString *hex);
 NSString   *getDeviceIdentifier(void);
@@ -26,3 +31,9 @@ void        deletePluginsAndReload(UIViewController *presenter);
 void        deleteThemesAndReload(UIViewController *presenter);
 void        moveCachedBundleToBackup(void);
 void        cleanupBundleBackup(void);
+BOOL        isRNNewArchEnabled(void);
+BOOL        isHermesBytecode(NSData *data);
+
+#ifdef __cplusplus
+}
+#endif

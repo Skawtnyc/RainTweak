@@ -81,7 +81,7 @@ void patchFonts(NSDictionary<NSString *, NSString *> *mainFonts, NSString *fontD
     }
 
     NSString *fontJson = [NSString
-        stringWithContentsOfURL:[getPyoncordDirectory() URLByAppendingPathComponent:@"fonts.json"]
+        stringWithContentsOfURL:[getRainDirectory() URLByAppendingPathComponent:@"fonts.json"]
                        encoding:NSUTF8StringEncoding
                           error:nil];
     if (fontJson)
@@ -97,7 +97,7 @@ void patchFonts(NSDictionary<NSString *, NSString *> *mainFonts, NSString *fontD
         NSURL    *fontURL       = [NSURL URLWithString:url];
         NSString *fontExtension = fontURL.pathExtension;
 
-        NSURL *fontCachePath = [[[getPyoncordDirectory() URLByAppendingPathComponent:@"downloads"
+        NSURL *fontCachePath = [[[getRainDirectory() URLByAppendingPathComponent:@"downloads"
                                                                          isDirectory:YES]
             URLByAppendingPathComponent:@"fonts"
                             isDirectory:YES] URLByAppendingPathComponent:fontDefName
@@ -170,7 +170,7 @@ void patchFonts(NSDictionary<NSString *, NSString *> *mainFonts, NSString *fontD
                                                                          error:&jsonError];
                     if (!jsonError)
                     {
-                        [jsonData writeToURL:[getPyoncordDirectory()
+                        [jsonData writeToURL:[getRainDirectory()
                                                  URLByAppendingPathComponent:@"fontMap.json"]
                                   atomically:YES];
                     }
@@ -198,6 +198,22 @@ void patchFonts(NSDictionary<NSString *, NSString *> *mainFonts, NSString *fontD
     @autoreleasepool
     {
         fontMap = [NSMutableDictionary dictionary];
+
+        NSData *fontData = [NSData
+            dataWithContentsOfURL:[getRainDirectory() URLByAppendingPathComponent:@"fonts.json"]];
+        if (fontData)
+        {
+            NSError      *jsonError;
+            NSDictionary *fontDict = [NSJSONSerialization JSONObjectWithData:fontData
+                                                                      options:0
+                                                                        error:&jsonError];
+            if (!jsonError && fontDict[@"main"])
+            {
+                BunnyLog(@"Applying fonts before hooks...");
+                patchFonts(fontDict[@"main"], fontDict[@"name"]);
+            }
+        }
+
         BunnyLog(@"Font hooks initialized");
         %init;
     }

@@ -177,7 +177,7 @@
 
 - (void)openDocumentsDirectory {
     if (isJailbroken) {
-        NSString *filzaPath = [NSString stringWithFormat:@"filza://view%@", getPyoncordDirectory().path];
+        NSString *filzaPath = [NSString stringWithFormat:@"filza://view%@", getRainDirectory().path];
         NSURL *filzaURL = [NSURL URLWithString:[filzaPath stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]]];
         
         if ([[UIApplication sharedApplication] canOpenURL:filzaURL]) {

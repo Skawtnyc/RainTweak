@@ -4,27 +4,32 @@
 #import <objc/message.h>
 #import <spawn.h>
 #import <sys/utsname.h>
-
-extern id gBridge;
-id gBridge = nil;
+#import <dlfcn.h>
 
 BOOL isJailbroken = NO;
 
-NSURL *getPyoncordDirectory(void) {
+NSURL *getRainDirectory(void) {
+    BunnyLog(@"getRainDirectory: start");
     NSFileManager *fileManager  = [NSFileManager defaultManager];
+    BunnyLog(@"getRainDirectory: got fileManager");
     NSURL *documentDirectoryURL = [[fileManager URLsForDirectory:NSDocumentDirectory
-                                                       inDomains:NSUserDomainMask] lastObject];
+                                                   inDomains:NSUserDomainMask] lastObject];
+    BunnyLog(@"getRainDirectory: documentDirectoryURL = %@", documentDirectoryURL);
 
-    NSURL *pyoncordFolderURL = [documentDirectoryURL URLByAppendingPathComponent:@"pyoncord"];
+    NSURL *rainFolderURL = [documentDirectoryURL URLByAppendingPathComponent:@"rain"];
+    BunnyLog(@"getRainDirectory: rainFolderURL = %@", rainFolderURL);
 
-    if (![fileManager fileExistsAtPath:pyoncordFolderURL.path]) {
-        [fileManager createDirectoryAtURL:pyoncordFolderURL
-              withIntermediateDirectories:YES
-                               attributes:nil
-                                    error:nil];
+    if (![fileManager fileExistsAtPath:rainFolderURL.path]) {
+        BunnyLog(@"getRainDirectory: creating directory...");
+        [fileManager createDirectoryAtURL:rainFolderURL
+                  withIntermediateDirectories:YES
+                                   attributes:nil
+                                       error:nil];
+        BunnyLog(@"getRainDirectory: directory created");
     }
 
-    return pyoncordFolderURL;
+    BunnyLog(@"getRainDirectory: returning %@", rainFolderURL);
+    return rainFolderURL;
 }
 
 UIColor *hexToUIColor(NSString *hex) {
@@ -93,15 +98,6 @@ void reloadApp(UIViewController *viewController) {
     [viewController
         dismissViewControllerAnimated:NO
                            completion:^{
-                               if (gBridge &&
-                                   [gBridge isKindOfClass:NSClassFromString(@"RCTCxxBridge")]) {
-                                   SEL reloadSelector = NSSelectorFromString(@"reload");
-                                   if ([gBridge respondsToSelector:reloadSelector]) {
-                                       ((void (*)(id, SEL))objc_msgSend)(gBridge, reloadSelector);
-                                       return;
-                                   }
-                               }
-
                                UIApplication *app = [UIApplication sharedApplication];
                                ((void (*)(id, SEL))objc_msgSend)(app, @selector(suspend));
                                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.5 * NSEC_PER_SEC),
@@ -122,18 +118,18 @@ void loadCustomBundleFromURL(NSURL *url, UIViewController *viewController) {
 
 void deletePlugins(void) {
     [[NSFileManager defaultManager]
-        removeItemAtURL:[getPyoncordDirectory() URLByAppendingPathComponent:@"plugins"]
+        removeItemAtURL:[getRainDirectory() URLByAppendingPathComponent:@"plugins"]
                   error:nil];
 }
 
 void deleteThemes(void) {
     [[NSFileManager defaultManager]
-        removeItemAtURL:[getPyoncordDirectory() URLByAppendingPathComponent:@"themes"]
+        removeItemAtURL:[getRainDirectory() URLByAppendingPathComponent:@"themes"]
                   error:nil];
 }
 
 void deleteAllData(UIViewController *presenter) {
-    [[NSFileManager defaultManager] removeItemAtURL:getPyoncordDirectory() error:nil];
+    [[NSFileManager defaultManager] removeItemAtURL:getRainDirectory() error:nil];
     gracefulExit(presenter);
 }
 
@@ -418,12 +414,12 @@ static void showCommitsForBranch(NSString *branch, UIViewController *presenter,
 }
 
 NSURL *getBundleBackupURL(void) {
-    return [getPyoncordDirectory() URLByAppendingPathComponent:@"bundle.js.backup"];
+    return [getRainDirectory() URLByAppendingPathComponent:@"bundle.js.backup"];
 }
 
 void moveCachedBundleToBackup(void) {
     NSFileManager *fm = [NSFileManager defaultManager];
-    NSURL *bundleURL = [getPyoncordDirectory() URLByAppendingPathComponent:@"bundle.js"];
+    NSURL *bundleURL = [getRainDirectory() URLByAppendingPathComponent:@"bundle.js"];
     NSURL *backupURL = getBundleBackupURL();
 
     if ([fm fileExistsAtPath:backupURL.path]) {
@@ -449,7 +445,7 @@ void moveCachedBundleToBackup(void) {
 
 BOOL restoreBundleFromBackup(void) {
     NSFileManager *fm = [NSFileManager defaultManager];
-    NSURL *bundleURL = [getPyoncordDirectory() URLByAppendingPathComponent:@"bundle.js"];
+    NSURL *bundleURL = [getRainDirectory() URLByAppendingPathComponent:@"bundle.js"];
     NSURL *backupURL = getBundleBackupURL();
 
     if ([fm fileExistsAtPath:backupURL.path]) {
@@ -505,9 +501,29 @@ void refetchBundle(UIViewController *presenter) {
 void removeCachedBundle(void) {
     NSError *error = nil;
     [[NSFileManager defaultManager]
-        removeItemAtURL:[getPyoncordDirectory() URLByAppendingPathComponent:@"bundle.js"]
+        removeItemAtURL:[getRainDirectory() URLByAppendingPathComponent:@"bundle.js"]
                   error:&error];
     if (error) {
         BunnyLog(@"Failed to remove cached bundle: %@", error);
     }
+}
+
+BOOL isRNNewArchEnabled(void) {
+    BunnyLog(@"isRNNewArchEnabled: start");
+    id raw = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"RCTNewArchEnabled"];
+    BunnyLog(@"isRNNewArchEnabled: raw = %@", raw);
+    if (raw) {
+        return [raw boolValue];
+    }
+    BunnyLog(@"isRNNewArchEnabled: assuming YES (bridgeless)");
+    return YES;
+}
+
+BOOL isHermesBytecode(NSData *data) {
+    if (!data || data.length < 4) {
+        return NO;
+    }
+    const uint8_t *bytes = (const uint8_t *)data.bytes;
+    // Hermes bytecode magic: "Herm" (0x48 0x65 0x72 0x6d)
+    return bytes[0] == 0x48 && bytes[1] == 0x65 && bytes[2] == 0x72 && bytes[3] == 0x6d;
 }
